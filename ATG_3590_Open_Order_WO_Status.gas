@@ -1,0 +1,702 @@
+Program.Sub.ScreenSU.Start
+gui.SS_Form1..create
+gui.SS_Form1..caption("Open Order WO Status")
+gui.SS_Form1..size(2630,1565)
+gui.SS_Form1..position(0,0)
+gui.SS_Form1..event(unload,ss_form1_unload)
+gui.SS_Form1..alwaysontop(False)
+gui.SS_Form1..fontname("Arial")
+gui.SS_Form1..fontsize(8)
+gui.SS_Form1..forecolor(0)
+gui.SS_Form1..fontstyle(,,,,)
+gui.SS_Form1..BackColor(-2147483633)
+gui.SS_Form1..controlbox(True)
+gui.SS_Form1..maxbutton(False)
+gui.SS_Form1..minbutton(False)
+gui.SS_Form1..mousepointer(0)
+gui.SS_Form1..moveable(True)
+gui.SS_Form1..sizeable(False)
+gui.SS_Form1..ShowInTaskBar(True)
+gui.SS_Form1..titlebar(True)
+gui.SS_Form1.lbl_dp1.create(label,"Select Cutoff Date",True,1800,200,1,100,100,True,0,Arial,8,-2147483633,0)
+gui.SS_Form1.dp1.create(datepicker)
+gui.SS_Form1.dp1.visible(True)
+gui.SS_Form1.dp1.size(1800,345)
+gui.SS_Form1.dp1.zorder(0)
+gui.SS_Form1.dp1.position(100,300)
+gui.SS_Form1.dp1.enabled(True)
+gui.SS_Form1.dp1.checkbox(False)
+gui.SS_Form1.cmd1.create(button)
+gui.SS_Form1.cmd1.caption("Print")
+gui.SS_Form1.cmd1.visible(True)
+gui.SS_Form1.cmd1.size(1000,360)
+gui.SS_Form1.cmd1.zorder(0)
+gui.SS_Form1.cmd1.position(100,695)
+gui.SS_Form1.cmd1.enabled(True)
+gui.SS_Form1.cmd1.fontname("Arial")
+gui.SS_Form1.cmd1.fontsize(8)
+gui.SS_Form1.cmd1.event(click,cmd1_click)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.UDT.uOrder.Define("Order",String)
+Variable.UDT.uOrder.Define("Line",String)
+Variable.UDT.uOrder.Define("WO",String)
+Variable.UDT.uOrder.Define("Suffix",String)
+Variable.UDT.uOrder.Define("Customer",String)
+Variable.UDT.uOrder.Define("WODueDate",Date)
+Variable.UDT.uOrder.Define("OrderDueDate",String)
+Variable.UDT.uOrder.Define("WOQty",String)
+Variable.UDT.uOrder.Define("Description",String)
+Variable.UDT.uOrder.Define("ENGRActHrs",Float)
+Variable.UDT.uOrder.Define("ENGREstHrs",Float)
+Variable.UDT.uOrder.Define("SHOPActHrs",Float)
+Variable.UDT.uOrder.Define("SHOPEstHrs",Float)
+Variable.UDT.uOrder.Define("BENEstHrs",Float)
+Variable.UDT.uOrder.Define("BENActHrs",Float)
+Variable.UDT.uOrder.Define("InvoiceAmt",Float)
+Variable.UDT.uOrder.Define("OrderAmt",Float)
+Variable.UDT.uOrder.Define("RecType",Long)
+Variable.UDT.uOrder.Define("Invoice",String)
+Variable.uGlobal.uOrder.Declare("uOrder")
+Variable.Global.dStart.Declare(Date,1/1/2011)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: MLA
+'Project Start Date: 2/22/2011
+'Notes:
+'  Reuther Mold
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+Gui.SS_Form1..Show
+
+Program.Sub.Main.End
+
+Program.Sub.Invoiced.Start
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.fEngAct.Declare(Float)
+V.Local.fEngEst.Declare(Float)
+V.Local.fBenAct.Declare(Float)
+V.Local.fBenEst.Declare(Float)
+V.Local.fShopAct.Declare(Float)
+V.Local.fShopEst.Declare(Float)
+V.Local.iUB.Declare(Long)
+
+F.Intrinsic.Control.SetErrorHandler("Invoiced_Err")
+F.Intrinsic.Control.ClearErrors
+
+F.Intrinsic.String.Concat("Select * from V_ORDER_HIST_LINE where DATE_INVOICE >= '",V.Global.dStart.PervasiveDate,"'",V.Local.sSql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,=,-1)
+		V.uGlobal.uOrder.Redim(0,0)
+		V.uGlobal.uOrder!Invoice.Set(V.ODBC.con!rst.FieldValTrim!INVOICE)
+		V.uGlobal.uOrder!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder!Line.Set(V.ODBC.con!rst.FieldValTrim!ORDER_LINE)
+		V.uGlobal.uOrder!Customer.Set(V.ODBC.con!rst.FieldValTrim!NAME_CUST_SHIP)
+		V.uGlobal.uOrder!InvoiceAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION)
+		V.uGlobal.uOrder!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ORDER_DUE)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!ORDER_LINE,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder!WOQty.Set(0)
+			V.uGlobal.uOrder!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder!BENActHrs.Set(0)
+			V.uGlobal.uOrder!BENEstHrs.Set(0)
+			V.uGlobal.uOrder!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUALwhere JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'")
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder!RecType.Set(1)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.Else
+		V.Local.iUB.Set(V.uGlobal.uOrder.UBound)
+		F.Intrinsic.Math.Add(V.Local.iUB,1,V.Local.iUB)
+		V.uGlobal.uOrder.RedimPreserve(V.uGlobal.uOrder.LBound,V.Local.iUB)
+		V.uGlobal.uOrder(V.Local.iUB)!Invoice.Set(V.ODBC.con!rst.FieldValTrim!INVOICE)
+		V.uGlobal.uOrder(V.Local.iUB)!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder(V.Local.iUB)!Line.Set(V.ODBC.con!rst.FieldValTrim!ORDER_LINE)
+		V.uGlobal.uOrder(V.Local.iUB)!Customer.Set(V.ODBC.con!rst.FieldValTrim!NAME_CUST_SHIP)
+		V.uGlobal.uOrder(V.Local.iUB)!InvoiceAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ORDER_DUE)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!ORDER_LINE,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder(V.Local.iUB)!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder(V.Local.iUB)!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder(V.Local.iUB)!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder(V.Local.iUB)!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUAL from V_JOB_OPERATIONS_WC where JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'",V.Local.sSql)
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder(V.Local.iUB)!RecType.Set(1)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.EndIf
+	F.ODBC.con!rst.MoveNext
+F.Intrinsic.Control.Loop
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Invoiced_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError,"Error")
+	F.Intrinsic.Control.CallSub(Ss_form1_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Invoiced.End
+
+program.sub.ss_form1_unload.start
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+program.sub.ss_form1_unload.end
+
+program.sub.cmd1_click.start
+V.Local.sError.Declare(String)
+
+F.Intrinsic.Control.SetErrorHandler("Print_Err")
+F.Intrinsic.Control.ClearErrors
+
+Gui.SS_Form1..Visible(False)
+V.uGlobal.uOrder.Redim(-1,-1)
+V.Global.dStart.Set(V.Screen.SS_Form1!dp1.Value)
+F.Intrinsic.Control.CallSub(Invoiced)
+F.Intrinsic.Control.CallSub(Opship)
+F.Intrinsic.Control.CallSub(Opord)
+F.Intrinsic.Control.CallSub(Writerst)
+F.Intrinsic.Control.CallSub(Printbi)
+F.Intrinsic.Control.CallSub(Ss_form1_unload)
+
+
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Print_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+program.sub.cmd1_click.end
+
+Program.Sub.OpShip.Start
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.fEngAct.Declare(Float)
+V.Local.fEngEst.Declare(Float)
+V.Local.fBenAct.Declare(Float)
+V.Local.fBenEst.Declare(Float)
+V.Local.fShopAct.Declare(Float)
+V.Local.fShopEst.Declare(Float)
+V.Local.iUB.Declare(Long)
+
+F.Intrinsic.Control.SetErrorHandler("OpShip_Err")
+F.Intrinsic.Control.ClearErrors
+
+F.Intrinsic.String.Concat("Select * from V_SHIPMENT_LINES where DATE_SHIP >= '",V.Global.dStart.PervasiveDate,"'",V.Local.sSql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,=,-1)
+		V.uGlobal.uOrder.Redim(0,0)
+		V.uGlobal.uOrder!Invoice.Set(V.ODBC.con!rst.FieldValTrim!PCK_NO)
+		V.uGlobal.uOrder!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder!Line.Set(V.ODBC.con!rst.FieldValTrim!ORDER_REC)
+		F.Intrinsic.String.Concat("Select NAME_CUSTOMER from V_CUSTOMER_MASTER where CUSTOMER = '",V.ODBC.con!rst.FieldValTrim!CUSTOMER,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstCust",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstCust.EOF,<>,True)
+			V.uGlobal.uOrder!Customer.Set(V.ODBC.con!rstCust.FieldValTrim!NAME_CUSTOMER)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.con!rstCust.Close
+		V.uGlobal.uOrder!InvoiceAmt.Set(0)
+		V.uGlobal.uOrder!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ITEM_PROMISE)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!ORDER_REC,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder!WOQty.Set(0)
+			V.uGlobal.uOrder!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder!BENActHrs.Set(0)
+			V.uGlobal.uOrder!BENEstHrs.Set(0)
+			V.uGlobal.uOrder!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUALwhere JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'")
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder!RecType.Set(1)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.Else
+		V.Local.iUB.Set(V.uGlobal.uOrder.UBound)
+		F.Intrinsic.Math.Add(V.Local.iUB,1,V.Local.iUB)
+		V.uGlobal.uOrder.RedimPreserve(V.uGlobal.uOrder.LBound,V.Local.iUB)
+		V.uGlobal.uOrder(V.Local.iUB)!Invoice.Set(V.ODBC.con!rst.FieldValTrim!PCK_NO)
+		V.uGlobal.uOrder(V.Local.iUB)!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder(V.Local.iUB)!Line.Set(V.ODBC.con!rst.FieldValTrim!ORDER_REC)
+		F.Intrinsic.String.Concat("Select NAME_CUSTOMER from V_CUSTOMER_MASTER where CUSTOMER = '",V.ODBC.con!rst.FieldValTrim!CUSTOMER,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstCust",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstCust.EOF,<>,True)
+			V.uGlobal.uOrder(V.Local.iUB)!Customer.Set(V.ODBC.con!rstCust.FieldValTrim!NAME_CUSTOMER)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.con!rstCust.Close
+		V.uGlobal.uOrder(V.Local.iUB)!InvoiceAmt.Set(0)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ITEM_PROMISE)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!ORDER_REC,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder(V.Local.iUB)!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder(V.Local.iUB)!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder(V.Local.iUB)!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder(V.Local.iUB)!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUAL from V_JOB_OPERATIONS_WC where JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'",V.Local.sSql)
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder(V.Local.iUB)!RecType.Set(2)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.EndIf
+	F.ODBC.con!rst.MoveNext
+F.Intrinsic.Control.Loop
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("OpShip_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError,"Error")
+	F.Intrinsic.Control.CallSub(Ss_form1_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.OpShip.End
+
+Program.Sub.OpOrd.Start
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.fEngAct.Declare(Float)
+V.Local.fEngEst.Declare(Float)
+V.Local.fBenAct.Declare(Float)
+V.Local.fBenEst.Declare(Float)
+V.Local.fShopAct.Declare(Float)
+V.Local.fShopEst.Declare(Float)
+V.Local.iUB.Declare(Long)
+
+F.Intrinsic.Control.SetErrorHandler("OpOrd_Err")
+F.Intrinsic.Control.ClearErrors
+
+F.Intrinsic.String.Concat("Select * from V_ORDER_LINES where DATE_ORDER >= '",V.Global.dStart.PervasiveDate,"'",V.Local.sSql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,=,-1)
+		V.uGlobal.uOrder.Redim(0,0)
+		V.uGlobal.uOrder!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder!Line.Set(V.ODBC.con!rst.FieldValTrim!RECORD_NO)
+		F.Intrinsic.String.Concat("Select NAME_CUSTOMER from V_CUSTOMER_MASTER where CUSTOMER = '",V.ODBC.con!rst.FieldValTrim!CUSTOMER,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstCust",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstCust.EOF,<>,True)
+			V.uGlobal.uOrder!Customer.Set(V.ODBC.con!rstCust.FieldValTrim!NAME_CUSTOMER)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.con!rstCust.Close
+		V.uGlobal.uOrder!InvoiceAmt.Set(0)
+		V.uGlobal.uOrder!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ITEM_PROM)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!RECORD_NO,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder!WOQty.Set(0)
+			V.uGlobal.uOrder!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder!BENActHrs.Set(0)
+			V.uGlobal.uOrder!BENEstHrs.Set(0)
+			V.uGlobal.uOrder!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUALwhere JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'")
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder!RecType.Set(1)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.Else
+		V.Local.iUB.Set(V.uGlobal.uOrder.UBound)
+		F.Intrinsic.Math.Add(V.Local.iUB,1,V.Local.iUB)
+		V.uGlobal.uOrder.RedimPreserve(V.uGlobal.uOrder.LBound,V.Local.iUB)
+		V.uGlobal.uOrder(V.Local.iUB)!Order.Set(V.ODBC.con!rst.FieldValTrim!ORDER_NO)
+		V.uGlobal.uOrder(V.Local.iUB)!Line.Set(V.ODBC.con!rst.FieldValTrim!RECORD_NO)
+		F.Intrinsic.String.Concat("Select NAME_CUSTOMER from V_CUSTOMER_MASTER where CUSTOMER = '",V.ODBC.con!rst.FieldValTrim!CUSTOMER,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstCust",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstCust.EOF,<>,True)
+			V.uGlobal.uOrder(V.Local.iUB)!Customer.Set(V.ODBC.con!rstCust.FieldValTrim!NAME_CUSTOMER)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.con!rstCust.Close
+		V.uGlobal.uOrder(V.Local.iUB)!InvoiceAmt.Set(0)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderAmt.Set(V.ODBC.con!rst.FieldValFloat!EXTENSION_ORDER)
+		V.uGlobal.uOrder(V.Local.iUB)!OrderDueDate.Set(V.ODBC.con!rst.FieldVal!DATE_ITEM_PROM)
+		F.Intrinsic.String.Concat("Select * from V_ORDER_TO_WO where ORDER_NO = '",V.ODBC.con!rst.FieldValTrim!ORDER_NO,"' and ORDER_LINE = '",V.ODBC.con!rst.FieldValTrim!RECORD_NO,"'",V.Local.sSql)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstJob",V.Local.sSql)
+		F.Intrinsic.Control.If(V.ODBC.con!rstJob.EOF,=,True)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(0)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uOrder(V.Local.iUB)!WO.Set(V.ODBC.con!rstJob.FieldValTrim!JOB)
+			V.uGlobal.uOrder(V.Local.iUB)!Suffix.Set(V.ODBC.con!rstJob.FieldValTrim!SUFFIX)
+			V.uGlobal.uOrder(V.Local.iUB)!WOQty.Set(V.ODBC.con!rstJob.FieldValFloat!QTY_WO)
+			V.uGlobal.uOrder(V.Local.iUB)!WODueDate.Set(V.ODBC.con!rstJob.FieldVal!DATE_JOB_DUE)
+			V.uGlobal.uOrder(V.Local.iUB)!Description.Set(V.ODBC.con!rstJob.FieldValTrim!DESCRIPTION)
+			V.Local.fEngAct.Set(0)
+			V.Local.fEngEst.Set(0)
+			V.Local.fBenAct.Set(0)
+			V.Local.fBenEst.Set(0)
+			V.Local.fShopAct.Set(0)
+			V.Local.fShopEst.Set(0)
+			F.Intrinsic.String.Concat("Select WORKCENTER, HOURS_ESTIMATED, HOURS_ACTUAL from V_JOB_OPERATIONS_WC where JOB = '",V.ODBC.con!rstJob.FieldValTrim!JOB,"' and SUFFIX = '",V.ODBC.con!rstJob.FieldValTrim!SUFFIX,"'",V.Local.sSql)
+			F.ODBC.Connection!con.OpenRecordsetRO("rstJobOp",V.Local.sSql)
+			F.Intrinsic.Control.DoUntil(V.ODBC.con!rstJobOp.EOF,=,True)
+				F.Intrinsic.String.Concat("Select WC_DEPT from V_WORKCENTERS where MACHINE = '",V.ODBC.con!rstJobOp.FieldValTrim!WORKCENTER,"'",V.Local.sSql)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstWC",V.Local.sSql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstWC.EOF,<>,True)
+					F.Intrinsic.Control.If(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"ENGR")
+						F.Intrinsic.Math.Add(V.Local.fEngAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngAct)
+						F.Intrinsic.Math.Add(V.Local.fEngEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fEngEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"BEN")
+						F.Intrinsic.Math.Add(V.Local.fBenAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenAct)
+						F.Intrinsic.Math.Add(V.Local.fBenEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fBenEst)
+					F.Intrinsic.Control.ElseIf(V.ODBC.con!rstWC.FieldValTrim!WC_DEPT,=,"SHOP")
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.Math.Add(V.Local.fShopAct,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopAct)
+						F.Intrinsic.Math.Add(V.Local.fShopEst,V.ODBC.con!rstJobOp.FieldValFloat!HOURS_ACTUAL,V.Local.fShopEst)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.ODBC.con!rstWC.Close
+				F.ODBC.con!rstJobOp.MoveNext
+			F.Intrinsic.Control.Loop
+			F.ODBC.con!rstJobOp.Close
+			V.uGlobal.uOrder(V.Local.iUB)!ENGRActHrs.Set(V.Local.fEngAct)
+			V.uGlobal.uOrder(V.Local.iUB)!ENGREstHrs.Set(V.Local.fEngEst)
+			V.uGlobal.uOrder(V.Local.iUB)!BENActHrs.Set(V.Local.fBenAct)
+			V.uGlobal.uOrder(V.Local.iUB)!BENEstHrs.Set(V.Local.fBenEst)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPActHrs.Set(V.Local.fShopAct)
+			V.uGlobal.uOrder(V.Local.iUB)!SHOPEstHrs.Set(V.Local.fShopEst)
+		F.Intrinsic.Control.EndIf
+		V.uGlobal.uOrder(V.Local.iUB)!RecType.Set(3)
+		F.ODBC.con!rstJob.Close
+	F.Intrinsic.Control.EndIf
+	F.ODBC.con!rst.MoveNext
+F.Intrinsic.Control.Loop
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("OpOrd_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError,"Error")
+	F.Intrinsic.Control.CallSub(Ss_form1_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.OpOrd.End
+
+Program.Sub.WriteRST.Start
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.i.Declare(Long)
+
+F.Intrinsic.Control.SetErrorHandler("WriteRST_Err")
+F.Intrinsic.Control.ClearErrors
+
+F.Intrinsic.String.Concat("Delete ATG_3590_Odr_WO_Stat where Terminal = '",V.Caller.Terminal,"'",V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,<>,-1)
+	V.Local.sSql.Set("Select * from ATG_3590_Odr_WO_Stat")
+	F.ODBC.Connection!con.OpenRecordsetRW("rst",V.Local.sSql)
+	F.Intrinsic.Control.For(V.Local.i,V.uGlobal.uOrder.LBound,V.uGlobal.uOrder.UBound,1)
+		F.ODBC.con!rst.AddNew
+		F.ODBC.con!rst.Set!Terminal(V.Caller.Terminal)
+		F.ODBC.con!rst.Set!Order_No(V.uGlobal.uOrder(V.Local.i)!Order)
+		F.ODBC.con!rst.Set!Line(V.uGlobal.uOrder(V.Local.i)!Line)
+		F.ODBC.con!rst.Set!Customer(V.uGlobal.uOrder(V.Local.i)!Customer)
+		F.ODBC.con!rst.Set!Order_Due_Date(V.uGlobal.uOrder(V.Local.i)!OrderDueDate.PervasiveDate)
+		F.ODBC.con!rst.Set!Order_Amt(V.uGlobal.uOrder(V.Local.i)!OrderAmt)
+		F.ODBC.con!rst.Set!Invoice(V.uGlobal.uOrder(V.Local.i)!Invoice)
+		F.ODBC.con!rst.Set!Invoice_Amt(V.uGlobal.uOrder(V.Local.i)!InvoiceAmt)
+		F.ODBC.con!rst.Set!Job(V.uGlobal.uOrder(V.Local.i)!WO)
+		F.ODBC.con!rst.Set!Suffix(V.uGlobal.uOrder(V.Local.i)!Suffix)
+		F.Intrinsic.Control.If(V.uGlobal.uOrder(V.Local.i)!WODueDate,<>,"")
+			F.ODBC.con!rst.Set!Job_Due_Date(V.uGlobal.uOrder(V.Local.i)!WODueDate.PervasiveDate)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.con!rst.Set!Description(V.uGlobal.uOrder(V.Local.i)!Description)
+		F.ODBC.con!rst.Set!ENGR_Act_Hrs(V.uGlobal.uOrder(V.Local.i)!ENGRActHrs)
+		F.ODBC.con!rst.Set!ENGR_Est_Hrs(V.uGlobal.uOrder(V.Local.i)!ENGREstHrs)
+		F.ODBC.con!rst.Set!BEN_Act_Hrs(V.uGlobal.uOrder(V.Local.i)!BENActHrs)
+		F.ODBC.con!rst.Set!BEN_Est_Hrs(V.uGlobal.uOrder(V.Local.i)!BENEstHrs)
+		F.ODBC.con!rst.Set!SHOP_Act_Hrs(V.uGlobal.uOrder(V.Local.i)!SHOPActHrs)
+		F.ODBC.con!rst.Set!SHOP_Est_Hrs(V.uGlobal.uOrder(V.Local.i)!SHOPEstHrs)
+		F.ODBC.con!rst.Set!Rec_Type(V.uGlobal.uOrder(V.Local.i)!RecType)
+		F.ODBC.con!rst.Update
+	F.Intrinsic.Control.Next(V.Local.i)
+	F.ODBC.con!rst.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("WriteRST_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError,"Error")
+	F.Intrinsic.Control.CallSub(Ss_form1_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.WriteRST.End
+
+Program.Sub.PrintBI.Start
+V.Local.sError.Declare(String)
+V.Local.iBi.Declare(Long)
+V.Local.sParam.Declare(String)
+V.Local.sParamVal.Declare(String)
+
+F.Intrinsic.Control.SetErrorHandler("PrintBI_Err")
+F.Intrinsic.Control.ClearErrors
+
+F.Global.BI.GetIDFromName("ATG_3590_BI_Order_WO_Status.rpt",V.Local.iBi)
+V.Local.sParam.Set("Terminal*!*CutOffDate")
+F.Intrinsic.String.Concat(V.Caller.Terminal,"*!*",V.Screen.SS_Form1!dp1.Value,V.Local.sParamVal)
+F.Intrinsic.String.Split(V.Local.sParam,"*!*",V.Local.sParam)
+F.Intrinsic.String.Split(V.Local.sParamVal,"*!*",V.Local.sParamVal)
+F.Global.BI.PrintReport(V.Local.iBi,0,V.Local.sParam,V.Local.sParamVal,"",False)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("PrintBI_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.PrintBI.End
+
+Program.Sub.ScreenSS.Start
+SS_Form1{{CAPTION::Open Order WO Status
+SS_Form1.CTRL{{NAME::dp1\\TYPE::6\\CAPTION::Select Cutoff Date\\GROUP::-1\\BROWSER::0
+SS_Form1.CTRL{{NAME::cmd1\\TYPE::5\\CAPTION::Print\\GROUP::-1\\BROWSER::0
+
+Program.Sub.ScreenSS.End
+
